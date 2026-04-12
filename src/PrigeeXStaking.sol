@@ -5,11 +5,11 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title PrigeeX Staking Contract
- * @notice Allows users to stake PGX tokens and claim rewards using the accumulator pattern
- * @dev Reward distribution follows the Synthetix/SushiSwap MasterChef pattern (industry standard)
+ * @notice Allows users to stake PGX tokens and claim rewards using the accumulator pattern`
  * @dev Uses global rewardPerTokenStored accumulator instead of per-user timestamps
  */
 contract PrigeeXStaking is Ownable, ReentrancyGuard {
@@ -88,22 +88,38 @@ contract PrigeeXStaking is Ownable, ReentrancyGuard {
     /**
      * @notice Calculates the current reward per token staked (global accumulator)
      * @dev This value only increases over time, never resets
+     * @dev Uses Math.mulDiv to prevent overflow in multiplication
      * @return The accumulated rewards per token since contract inception
      */
     function rewardPerToken() public view returns (uint256) {
         if (totalStaked == 0) {
             return rewardPerTokenStored;
         }
-        return rewardPerTokenStored + ((rewardRate * (lastTimeRewardApplicable() - lastUpdateTime) * 1e18) / totalStaked);
+        uint256 timeDelta = lastTimeRewardApplicable() - lastUpdateTime;
+        // Use mulDiv to prevent overflow: (rewardRate * timeDelta * 1e18) / totalStaked
+        uint256 additionalRewards = Math.mulDiv(
+            rewardRate * timeDelta,
+            1e18,
+            totalStaked
+        );
+        return rewardPerTokenStored + additionalRewards;
     }
 
     /**
      * @notice Calculates earned rewards for an account
      * @param account The address to calculate rewards for
      * @return The total rewards earned (including already accrued but unclaimed)
+     * @dev Uses Math.mulDiv to prevent overflow in multiplication
      */
     function earned(address account) public view returns (uint256) {
-        return ((balanceOf[account] * (rewardPerToken() - userRewardPerTokenPaid[account])) / 1e18) + rewards[account];
+        uint256 rewardDiff = rewardPerToken() - userRewardPerTokenPaid[account];
+        if (rewardDiff == 0) return rewards[account];
+        // Use mulDiv to prevent overflow: (balance * rewardDiff) / 1e18
+        return Math.mulDiv(
+            balanceOf[account],
+            rewardDiff,
+            1e18
+        ) + rewards[account];
     }
 
     /**
