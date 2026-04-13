@@ -50,7 +50,10 @@ contract PrigeeXStaking is Ownable, ReentrancyGuard {
      * @param _stakingToken The address of the PrigeeX (PGX) token
      * @param _rewardToken The address of the reward token (can be same as stakingToken)
      */
-    constructor(address _stakingToken, address _rewardToken) Ownable(msg.sender) {
+    constructor(
+        address _stakingToken,
+        address _rewardToken
+    ) Ownable(msg.sender) {
         stakingToken = IERC20(_stakingToken);
         rewardToken = IERC20(_rewardToken);
     }
@@ -115,11 +118,9 @@ contract PrigeeXStaking is Ownable, ReentrancyGuard {
         uint256 rewardDiff = rewardPerToken() - userRewardPerTokenPaid[account];
         if (rewardDiff == 0) return rewards[account];
         // Use mulDiv to prevent overflow: (balance * rewardDiff) / 1e18
-        return Math.mulDiv(
-            balanceOf[account],
-            rewardDiff,
-            1e18
-        ) + rewards[account];
+        return
+            Math.mulDiv(balanceOf[account], rewardDiff, 1e18) +
+            rewards[account];
     }
 
     /**
@@ -127,7 +128,9 @@ contract PrigeeXStaking is Ownable, ReentrancyGuard {
      * @param amount The amount of tokens to stake
      * @dev Calls updateReward to save pending rewards BEFORE updating balance
      */
-    function stake(uint256 amount) external nonReentrant updateReward(msg.sender) {
+    function stake(
+        uint256 amount
+    ) external nonReentrant updateReward(msg.sender) {
         if (amount == 0) revert ZeroAmount();
 
         balanceOf[msg.sender] += amount;
@@ -142,7 +145,9 @@ contract PrigeeXStaking is Ownable, ReentrancyGuard {
      * @param amount The amount of tokens to withdraw
      * @dev Calls updateReward to save pending rewards BEFORE updating balance
      */
-    function withdraw(uint256 amount) external nonReentrant updateReward(msg.sender) {
+    function withdraw(
+        uint256 amount
+    ) external nonReentrant updateReward(msg.sender) {
         if (amount == 0) revert ZeroAmount();
         if (balanceOf[msg.sender] < amount) revert InsufficientStakedBalance();
 
@@ -173,7 +178,11 @@ contract PrigeeXStaking is Ownable, ReentrancyGuard {
      * @notice Emergency withdrawal of all staked tokens (forfeits any pending rewards)
      * @dev Forfeits rewards by zeroing them out, returns only staked principal
      */
-    function emergencyWithdraw() external nonReentrant updateReward(msg.sender) {
+    function emergencyWithdraw()
+        external
+        nonReentrant
+        updateReward(msg.sender)
+    {
         uint256 amount = balanceOf[msg.sender];
         if (amount == 0) revert ZeroAmount();
 
@@ -192,7 +201,9 @@ contract PrigeeXStaking is Ownable, ReentrancyGuard {
      * @param amount The amount of reward tokens to add
      * @dev Calls updateReward with address(0) to update accumulator without user snapshot
      */
-    function fundRewards(uint256 amount) external nonReentrant updateReward(address(0)) {
+    function fundRewards(
+        uint256 amount
+    ) external nonReentrant updateReward(address(0)) {
         if (amount == 0) revert ZeroAmount();
 
         rewardBalance += amount;
@@ -204,9 +215,13 @@ contract PrigeeXStaking is Ownable, ReentrancyGuard {
     /**
      * @notice Sets the reward rate and starts a new reward period
      * @param _rewardRate The new reward rate (rewards per second)
+     * @dev Checkpoints accumulator with OLD rate before changing to prevent reward miscalculation
      * @dev Sets periodFinish to 1 year from now as default
      */
-    function setRewardRate(uint256 _rewardRate) external onlyOwner {
+    function setRewardRate(
+        uint256 _rewardRate
+    ) external onlyOwner updateReward(address(0)) {
+        // Now safe to change rate for future calculations
         rewardRate = _rewardRate;
         periodFinish = block.timestamp + 365 days; // Default 1 year reward period
         emit RewardRateUpdated(_rewardRate);

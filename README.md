@@ -79,8 +79,8 @@ forge script script/Deploy.s.sol \
 
 | Contract | Address | Etherscan |
 |----------|---------|-----------|
-| PrigeeX (PGX) | `0xe013a6533e14F0D7a67A449524de9df1cdeD0d1D` | [View](https://sepolia.etherscan.io/address/0xe013a6533e14f0d7a67a449524de9df1cded0d1d) |
-| PrigeeXStaking | `0x4C1B921975ea1B536282Ef2E8Eae341c58B80229` | [View](https://sepolia.etherscan.io/address/0x4c1b921975ea1b536282ef2e8eae341c58b80229) |
+| PrigeeX (PGX) | `0x828B8fAF6c38eB666dFA8c1F22b106ca1FCecf0c` | [View](https://sepolia.etherscan.io/address/0x828b8faf6c38eb666dfa8c1f22b106ca1fcecf0c) |
+| PrigeeXStaking | `0xDD8A20b1ABbD84a52d02Dc623E756E880FB13b6b` | [View](https://sepolia.etherscan.io/address/0xdd8a20b1abbd84a52d02dc623e756e880fb13b6b) |
 
 ## Frontend Integration
 
