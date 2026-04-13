@@ -14,10 +14,10 @@ This project implements a basic DEX staking system with two smart contracts:
 
 | Item | Status | Details |
 |------|--------|---------|
-| PrigeeX Token | Deployed | `0xe013a6533e14F0D7a67A449524de9df1cdeD0d1D` |
-| PrigeeXStaking | Deployed | `0x4C1B921975ea1B536282Ef2E8Eae341c58B80229` |
-| Token Verification | Verified | [Etherscan](https://sepolia.etherscan.io/address/0xe013a6533e14f0d7a67a449524de9df1cded0d1d) |
-| Staking Verification | Verified | [Etherscan](https://sepolia.etherscan.io/address/0x4c1b921975ea1b536282ef2e8eae341c58b80229) |
+| PrigeeX Token | Deployed | `0x828B8fAF6c38eB666dFA8c1F22b106ca1FCecf0c` |
+| PrigeeXStaking | Deployed | `0xDD8A20b1ABbD84a52d02Dc623E756E880FB13b6b` |
+| Token Verification | Verified | [Etherscan](https://sepolia.etherscan.io/address/0x828b8faf6c38eb666dfa8c1f22b106ca1fcecf0c) |
+| Staking Verification | Verified | [Etherscan](https://sepolia.etherscan.io/address/0xdd8a20b1abbd84a52d02dc623e756e880fb13b6b) |
 | Network | Sepolia | Chain ID: 11155111 |
 | Block | 10638998 | Both contracts deployed in same block |
 | Gas Used | 2,237,495 | Total for both contracts |
@@ -209,10 +209,18 @@ function getStake(address account) external view returns (uint256)
 
 #### setRewardRate(uint256 _rewardRate)
 ```solidity
-function setRewardRate(uint256 _rewardRate) external onlyOwner
+function setRewardRate(uint256 _rewardRate) external onlyOwner updateReward(address(0))
 ```
 - **Access**: Owner only
-- **Purpose**: Configure reward rate (rewards per second per token staked, scaled by 1e18)
+- **Purpose**: Configure reward rate (rewards per second)
+- **CRITICAL**: Calls `updateReward(address(0))` BEFORE changing rate to checkpoint accumulator
+- **Flow**:
+  1. Updates global accumulator with OLD rate
+  2. Updates lastUpdateTime
+  3. Changes rewardRate to new value
+  4. Sets periodFinish to 1 year from now
+  5. Emits `RewardRateUpdated` event
+- **Why checkpoint?**: Prevents retroactive reward recalculation when rate changes
 
 #### pendingRewards(address account)
 ```solidity
@@ -283,11 +291,11 @@ function getRewardBalance() external view returns (uint256)
 
 ## Test Coverage
 
-### Test Results: 29/29 PASSED
+### Test Results: 80/80 PASSED
 
 ```
 Ran 11 tests for test/PrigeeX.t.sol:PrigeeXTest
-Ran 18 tests for test/PrigeeXStaking.t.sol:PrigeeXStakingTest
+Ran 69 tests for test/PrigeeXStaking.t.sol:PrigeeXStakingTest
 ```
 
 ### Token Tests (PrigeeX.t.sol)
@@ -308,44 +316,23 @@ Ran 18 tests for test/PrigeeXStaking.t.sol:PrigeeXStakingTest
 
 ### Staking Tests (PrigeeXStaking.t.sol)
 
-| Test | What It Verifies |
-|------|------------------|
-| `test_InitialState` | Contract initializes with accumulator pattern |
-| `test_Stake` | Staking updates balances, emits event |
-| `test_Stake_RevertZeroAmount` | Cannot stake 0 tokens |
-| `test_Stake_RevertInsufficientBalance` | Cannot stake more than owned |
-| `test_Stake_MultipleUsers` | Multiple users can stake independently |
-| `test_Withdraw` | Partial withdrawal works correctly |
-| `test_Withdraw_Full` | Full withdrawal returns all tokens |
-| `test_Withdraw_RevertZeroAmount` | Cannot withdraw 0 |
-| `test_Withdraw_RevertInsufficientStakedBalance` | Cannot withdraw more than staked |
-| `test_MultipleStakes_AccumulateRewardsCorrectly` | **Multiple stakes don't lose rewards** |
-| `test_MultipleUsers_FairRewardDistribution` | Fair proportional rewards for all users |
-| `test_WithdrawAndRestake_AccumulateRewardsCorrectly` | **Withdraw+restake preserves rewards** |
-| `test_ClaimRewards` | Reward claiming works correctly |
-| `test_ClaimRewards_MultipleClaims` | Multiple claims work correctly |
-| `test_ClaimRewards_RevertZeroRewards` | Cannot claim with 0 rewards |
-| `test_ClaimRewards_RevertInsufficientRewardBalance` | Cannot claim if pool underfunded |
-| `test_FundRewards` | Owner can fund rewards |
-| `test_FundRewards_RevertZeroAmount` | Cannot fund 0 tokens |
-| `test_FundRewards_MultipleFunds` | Multiple funding works |
-| `test_FundRewards_AnyoneCanFund` | Anyone can fund reward pool |
-| `test_EmergencyWithdraw` | Emergency withdrawal returns all tokens |
-| `test_EmergencyWithdraw_RevertZeroBalance` | Cannot emergency withdraw with 0 balance |
-| `test_EmergencyWithdraw_ForfeitsRewards` | Emergency withdraw forfeits rewards |
-| `test_SetRewardRate` | Owner can set reward rate |
-| `test_SetRewardRate_RevertNotOwner` | Non-owner cannot set reward rate |
-| `test_RewardPerToken_NoStakers` | No rewards with 0 staked |
-| `test_RewardPerToken_IncreasesOverTime` | Accumulator increases over time |
-| `test_Earned_NoRewardsForZeroStake` | No rewards for non-stakers |
-| `test_Earned_CalculatesCorrectly` | Reward calculation is accurate |
-| `test_LastTimeRewardApplicable_BeforePeriodSet` | Handles unset period |
-| `test_LastTimeRewardApplicable_AfterPeriodFinish` | Stops after period ends |
-| `test_RewardPerToken_StopsAfterPeriodFinish` | Accumulator stops increasing |
-| `test_GetRewardBalance` | Reward balance view works |
-| `testFuzz_Stake` | Fuzz test: random stake amounts |
-| `testFuzz_StakeAndWithdraw` | Fuzz test: stake then withdraw |
-| `testFuzz_EarnedRewards` | Fuzz test: random reward calculations |
+| Category | Tests | Description |
+|----------|-------|-------------|
+| **Initialization** | 1 | Contract setup verification |
+| **Basic Staking** | 4 | Stake, zero amount, insufficient balance, multiple users |
+| **Basic Withdraw** | 4 | Partial, full, zero amount, insufficient balance |
+| **Accumulator Pattern** | 3 | Multiple stakes don't lose rewards, multi-user fair distribution, withdraw+restake preserves rewards |
+| **Claim Rewards** | 4 | Basic claim, zero rewards, insufficient balance, multiple claims |
+| **Fund Rewards** | 4 | Basic fund, zero amount, multiple funds, anyone can fund |
+| **Emergency Withdraw** | 3 | Basic, zero balance, forfeits rewards |
+| **Reward Rate** | 2 | Set rate, not owner |
+| **⭐ Rate Change Checkpoint** | **3** | **Rate drop preserves past, rate raise doesn't inflate past, multi-user with Bob claiming first** |
+| **⭐ Multi-User Scenarios** | **11** | **3 users staggered entry, equal/unequal stakes, partial withdraw + new entry, 4-user complex interleaving, full exit + re-enter, claim midway doesn't affect others** |
+| **⭐ Rate Change + Multi-User** | **4** | **Rate increase forward-only, rate decrease preserves past, multiple rapid rate changes, rate=0 stops accrual** |
+| **Reward Calculation** | 7 | No stakers, increases over time, calculates correctly, period boundaries |
+| **Edge Cases** | 7 | Minimal stake (1 wei), large stake no overflow, zero duration, very large time warp |
+| **Fuzz Tests** | 12 | Random stake amounts, withdraw amounts, earn rewards with various inputs |
+| **Total** | **69** | **Comprehensive coverage of all scenarios** |
 
 ---
 
@@ -502,10 +489,15 @@ This project uses the **battle-tested accumulator pattern**, which is:
 | Multiple stakes don't lose rewards (accumulator) | PASS |
 | Withdraw+restake preserves rewards | PASS |
 | Fair proportional reward distribution | PASS |
+| Rate change checkpoints before modifying | PASS |
+| Rate increase only affects future rewards | PASS |
+| Rate decrease preserves past rewards | PASS |
+| Multiple rapid rate changes work correctly | PASS |
 | Events emit correctly | PASS |
 | Access control enforced | PASS |
 | Reentrancy protection active | PASS |
-| All 47 tests pass | PASS |
+| Math.mulDiv prevents overflow | PASS |
+| All 80 tests pass | PASS |
 | Deployed to Sepolia | PASS |
 | Verified on Etherscan | PASS |
 
@@ -544,20 +536,20 @@ cat out/PrigeeX.sol/PrigeeX.json | jq '.abi'
 
 ```bash
 # Check token balance
-cast call 0xe013a6533e14F0D7a67A449524de9df1cdeD0d1D \
+cast call 0x828B8fAF6c38eB666dFA8c1F22b106ca1FCecf0c \
   "balanceOf(address)" <your-address> --rpc-url $SEPOLIA_RPC_URL
 
 # Check staked balance
-cast call 0x4C1B921975ea1B536282Ef2E8Eae341c58B80229 \
+cast call 0xDD8A20b1ABbD84a52d02Dc623E756E880FB13b6b \
   "getStake(address)" <your-address> --rpc-url $SEPOLIA_RPC_URL
 
 # Approve staking contract
-cast send 0xe013a6533e14F0D7a67A449524de9df1cdeD0d1D \
-  "approve(address,uint256)" 0x4C1B921975ea1B536282Ef2E8Eae341c58B80229 1000000000000000000 \
+cast send 0x828B8fAF6c38eB666dFA8c1F22b106ca1FCecf0c \
+  "approve(address,uint256)" 0xDD8A20b1ABbD84a52d02Dc623E756E880FB13b6b 1000000000000000000 \
   --private-key $PRIVATE_KEY --rpc-url $SEPOLIA_RPC_URL
 
 # Stake tokens
-cast send 0x4C1B921975ea1B536282Ef2E8Eae341c58B80229 \
+cast send 0xDD8A20b1ABbD84a52d02Dc623E756E880FB13b6b \
   "stake(uint256)" 1000000000000000000 \
   --private-key $PRIVATE_KEY --rpc-url $SEPOLIA_RPC_URL
 ```
@@ -572,14 +564,19 @@ This project successfully implements:
 2. **PrigeeXStaking**: A professional staking contract using the **accumulator pattern** (same as Aave/SushiSwap):
    - Stake/withdraw PGX tokens
    - **Claim rewards** with no loss on multiple stakes
+   - **Rate change checkpoint** prevents retroactive reward miscalculation
    - Emergency withdraw (forfeits rewards)
    - Reward rate configuration
    - Owner-funded reward pool
-3. **Comprehensive Tests**: 47 tests covering all scenarios including:
+3. **Comprehensive Tests**: 80 tests covering all scenarios including:
    - Multiple stakes without reward loss
    - Withdraw+restake preserving rewards
    - Fair proportional distribution
+   - **Rate change correctness** (increase/decrease/multiple changes)
+   - **Multi-user scenarios** (3-4 users staggered entry)
+   - **Claim order independence** (Bob claiming first doesn't affect Alice)
    - Fuzz testing for edge cases
+   - Overflow protection with Math.mulDiv
 4. **Sepolia Deployment**: Both contracts deployed and verified on Etherscan
 5. **Documentation**: Complete README with setup instructions, frontend integration examples, and quick start guides
 
